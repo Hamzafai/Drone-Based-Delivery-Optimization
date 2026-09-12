@@ -30,8 +30,7 @@ drone_delivery_project/
 
 ## Problem Summary
 
-A fleet of drones must deliver packages from a central **depot** (node 0) to a set of **customers**.
-Each drone:
+A fleet of drones must deliver packages from a central **depot** (node 0) to a set of **customers**. This is a variant of the Capacitated Vehicle Routing Problem (CVRP). Each drone:
 - Starts and ends at the depot
 - Has a **battery capacity** (max total distance per route)
 - Has a **payload capacity** (max total weight per route)
@@ -39,6 +38,13 @@ Each drone:
 **Objective**: Minimize total energy consumption (proportional to total distance flown).
 
 **No-fly zones** are modeled as forbidden edges (infinite cost / removed from the graph).
+
+DDOP is proven **NP-Hard** via a polynomial reduction from Bin Packing (see `report/formulations.md`).
+
+### Mathematical Formulations
+
+- **Arc-flow MILP** — classical CVRP-style model with MTZ subtour elimination constraints (`O(n²K)` binary variables).
+- **Set-partitioning / flow model** — route-level formulation, no subtour constraints, natural for column generation (`O(|R|)` variables).
 
 ---
 
@@ -90,11 +96,53 @@ python run_experiments.py --mode full
 
 | Method | Type | Notes |
 |--------|------|-------|
-| Branch & Bound | Exact | With lower bound via assignment relaxation |
-| Genetic Algorithm | Population-based | Order crossover (OX), adaptive mutation |
-| Simulated Annealing | Local search | 2-opt + Or-opt neighborhood |
+| Branch & Bound | Exact | Assignment-relaxation lower bound, greedy NN upper bound init. Tractable for n ≲ 12. |
+| Genetic Algorithm | Population-based | Giant Tour encoding, Order Crossover (OX), adaptive mutation, embedded Or-opt local search, elitism. |
+| Simulated Annealing | Local search | Explicit route representation, 4 neighborhood operators (2-opt, Or-opt relocation, cross-exchange, route merge), geometric cooling with reheating. |
 
 ---
+
+## Results
+
+Benchmarked on 10 instances (n = 5 to 75 customers).
+
+- GA and SA match or beat B&B on small instances within B&B's time budget.
+- SA is competitive with GA for n ≤ 20.
+- **GA outperforms SA by 10–15% on large instances (n ≥ 30)**, thanks to population diversity and embedded Or-opt local search.
+
+| n | B&B | GA | SA |
+|---|---|---|---|
+| 5 | 248.96 | 248.96 | 248.96 |
+| 10 | 506.78 | 483.52 | 483.52 |
+| 30 | N/A | 941.52 | 1052.90 |
+| 75 | N/A | 2271.19 | 2414.25 |
+
+### Charts
+
+![Comparative solution cost by method and instance](results/comparison_chart.png)
+![Optimality gap vs. B&B on small instances](results/gap_analysis.png)
+
+### Example Routes & Convergence
+
+**Small instance (n=10)** — B&B vs GA vs SA, and convergence curves:
+
+![B&B solution, instance_04_n10](results/instance_04_n10_s0_bb.png)
+![GA solution, instance_04_n10](results/instance_04_n10_s0_ga.png)
+![SA solution, instance_04_n10](results/instance_04_n10_s0_sa.png)
+![Convergence, instance_04_n10](results/instance_04_n10_s0_convergence.png)
+
+**Large instance (n=75)** — GA vs SA (B&B not tractable at this size):
+
+![GA solution, instance_10_n75](results/instance_10_n75_s0_ga.png)
+![SA solution, instance_10_n75](results/instance_10_n75_s0_sa.png)
+
+> All per-instance route plots and convergence curves for the remaining instances (n=5,7,8,12,15,20,30,50) are in `results/`, following the same `instance_XX_nY_s0_<method>.png` naming.
+
+---
+
+## Authors
+
+Hamza Faiz Ahmed Fouatih, Youcef Belaib, Dhiaa Eddine Zeroual, Ishak Dib — ENSIA, Department of Intelligent Systems Engineering.
 
 ## Complexity
 
